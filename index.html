@@ -109,7 +109,7 @@ function drawDash(d) {
     if (cd) cd.querySelector('.cd').dataset.start = k.startAt;
     box.append(h('div', { className: 'card' }, h('div', { className: 'row' }, h('b', { textContent: k.judul }), h('span', { className: 'badge ' + k.status, textContent: lab })),
       k.mapel ? h('div', { className: 'mu', textContent: k.mapel }) : '', k.deskripsi ? h('p', { textContent: k.deskripsi }) : '',
-      h('div', { className: 'mu', textContent: 'Mulai ' + fmt(k.startAt) + ' · Berakhir ' + fmt(k.endAt) + ' · ' + k.jumlahSoal + ' soal · 4 detik per soal' }), cd, act));
+      h('div', { className: 'mu', textContent: 'Mulai ' + fmt(k.startAt) + ' · Berakhir ' + fmt(k.endAt) + ' · ' + k.jumlahSoal + ' soal · 10 detik per soal' }), cd, act));
   });
   tickDash();
 }
@@ -165,7 +165,7 @@ async function send(qid, jawaban, btn) {
 function tick() { // timer lokal dari jam server (bukan jam perangkat)
   if (snap) {
     if (snap.status === 'Scheduled') { const s = Math.max(0, Math.ceil((snap.quizStart - now()) / 1000)); $('waitCount').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
-    else if (snap.status === 'Live') { const left = Math.max(0, snap.qEnd - now()); $('timer').textContent = (left / 1000).toFixed(1); $('barFill').style.width = Math.min(100, left / 40) + '%'; if (left === 0) lock(true); }
+    else if (snap.status === 'Live') { const left = Math.max(0, snap.qEnd - now()); $('timer').textContent = (left / 1000).toFixed(1); $('barFill').style.width = Math.min(100, left / 100) + '%'; if (left === 0) lock(true); }
   }
   T.raf = requestAnimationFrame(tick);
 }
