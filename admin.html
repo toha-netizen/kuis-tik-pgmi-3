@@ -15,7 +15,7 @@
   .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}.stat{text-align:center;margin:0}.stat b{font-size:26px;display:block}
   .scroll{overflow-x:auto}table{width:100%;border-collapse:collapse}td,th{padding:6px 8px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:top}
   .hide{display:none}.mu{color:var(--mu)}.err{color:var(--er)}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-  details{margin-top:10px}summary{cursor:pointer;font-weight:600}.chk{max-height:180px;overflow:auto;border:1px solid var(--bd);border-radius:8px;padding:6px}.chk label{display:block}
+  details{margin-top:10px}summary{cursor:pointer;font-weight:600}fieldset.dt{border:1px solid var(--bd);border-radius:10px;margin:8px 0}.lbl{width:64px}.rk1{font-weight:700}.live{color:var(--er);font-weight:700}.chk{max-height:180px;overflow:auto;border:1px solid var(--bd);border-radius:8px;padding:6px}.chk label{display:block}
 </style>
 </head>
 <body>
@@ -31,7 +31,7 @@
 
     <!-- Ringkasan & pemantauan -->
     <section id="t-ringkasan" class="card"><div id="dash" class="grid"></div><button id="btnDash">Muat ulang</button>
-      <h3>Pantau sesi kuis</h3><div class="row"><select id="mQuiz"></select><label><input type="checkbox" id="mAuto"> Muat otomatis (3 dtk)</label><button id="btnMon">Pantau</button></div>
+      <h3>Pantau sesi kuis</h3><div class="row"><select id="mQuiz"></select><label><input type="checkbox" id="mAuto"> Muat otomatis (3 dtk)</label><button id="btnMon">Pantau</button><button id="btnMonLb">Lihat peringkat</button></div>
       <div id="mon" class="grid"></div></section>
 
     <!-- Siswa -->
@@ -51,10 +51,18 @@
         <select id="qzMode"><option value="semua">Peserta: semua / sesuai kelas</option><option value="terpilih">Peserta: dipilih manual</option></select>
         <select id="qzStatus"><option>draft</option><option>published</option><option>archived</option></select></div>
       <textarea id="qzDesk" placeholder="Deskripsi"></textarea>
-      <div class="row"><label>Mulai <input id="qzStart" type="datetime-local"></label><label>Berakhir <input id="qzEnd" type="datetime-local"></label>
-        <label><input id="qzShow" type="checkbox"> Tampilkan hasil ke siswa setelah selesai</label></div>
+      <fieldset class="dt"><legend>Jadwal kuis (zona waktu mengikuti perangkat Anda)</legend>
+        <div class="row"><b class="lbl">Mulai</b><input id="qzStartD" type="date" aria-label="Tanggal mulai"><button type="button" data-pick="qzStartD" title="Pilih tanggal">📅</button>
+          <input id="qzStartT" type="time" step="60" aria-label="Jam mulai"><button type="button" data-pick="qzStartT" title="Pilih jam">🕐</button></div>
+        <div class="row"><b class="lbl">Berakhir</b><input id="qzEndD" type="date" aria-label="Tanggal berakhir"><button type="button" data-pick="qzEndD" title="Pilih tanggal">📅</button>
+          <input id="qzEndT" type="time" step="60" aria-label="Jam berakhir"><button type="button" data-pick="qzEndT" title="Pilih jam">🕐</button>
+          <label>atau durasi <input id="qzDur" type="number" min="1" step="1" style="width:80px" aria-label="Durasi menit"> menit</label></div>
+        <div class="row"><span class="mu">Jalan pintas mulai:</span><button type="button" data-preset="5">+5 menit</button><button type="button" data-preset="15">+15 menit</button><button type="button" data-preset="60">+1 jam</button><button type="button" data-preset="tomorrow">Besok 07:00</button>
+          <button type="button" id="btnAutoEnd">Hitung berakhir otomatis (jumlah soal × durasi + 1 menit)</button></div>
+        <p id="qzSummary" class="mu" role="status"></p></fieldset>
+      <label><input id="qzShow" type="checkbox"> Tampilkan hasil ke siswa setelah selesai</label>
       <button class="pr" id="btnSaveQz">Simpan kuis</button> <button id="btnNewQz">Kosongkan form</button>
-      <p class="mu">Durasi tiap soal tetap 25 detik. Setelah kuis dimulai: waktu mulai dan peserta terkunci; waktu berakhir masih bisa diubah (tercatat di audit).</p>
+      <p class="mu">Durasi tiap soal tetap <b id="slotInfo">25</b> detik. Setelah kuis dimulai: waktu mulai dan peserta terkunci; waktu berakhir masih bisa diubah (tercatat di audit).</p>
       <div class="scroll"><table id="qzTable"></table></div>
 
       <div id="pBox" class="hide"><h3 id="pTitle"></h3><p class="mu">Centang peserta (dipakai bila mode "dipilih manual").</p><input id="pFilter" placeholder="Cari"><div id="pList" class="chk"></div><button class="pr" id="btnSaveP">Simpan peserta</button></div>
@@ -72,13 +80,29 @@
           <div class="row"><label><input type="checkbox" id="qCase" checked> abaikan kapital</label><label><input type="checkbox" id="qSpace" checked> rapikan spasi</label><label><input type="checkbox" id="qPunct"> abaikan tanda baca</label><label><input type="checkbox" id="qDia"> abaikan aksen</label><label><input type="checkbox" id="qNum"> bandingkan sebagai angka</label></div></div>
         <div id="qUr" class="hide"><input id="qKunciUr" placeholder="Jawaban acuan (untuk pemeriksa)" style="width:100%"><textarea id="qRubrik" placeholder="Rubrik penilaian"></textarea></div>
         <div><button class="pr" id="btnSaveQ">Simpan soal</button> <button id="btnNewQ">Kosongkan</button></div>
+        <details id="impQ"><summary>Impor soal dari CSV (dengan template)</summary>
+          <p class="mu">1) Unduh template · 2) isi di Excel/Google Sheets · 3) simpan sebagai <b>CSV (UTF-8)</b> · 4) pilih berkas di sini lalu klik Impor. Semua baris diperiksa dulu; bila ada yang salah, <b>tidak ada soal yang disimpan</b> dan kesalahan ditampilkan per baris.</p>
+          <div class="row"><button id="btnTpl">⬇ Unduh template CSV</button><button id="btnExpQ">⬇ Unduh soal kuis ini (CSV)</button></div>
+          <div class="row"><input type="file" id="qCsv" accept=".csv,text/csv"><label><input type="radio" name="impMode" value="tambah" checked> Tambahkan setelah soal yang ada</label><label><input type="radio" name="impMode" value="ganti"> Ganti semua soal kuis ini</label><button class="pr" id="btnImpQ">Impor soal</button></div>
+          <div id="impQRes" class="mu" role="status"></div>
+          <details><summary>Petunjuk pengisian kolom</summary><ul class="mu">
+            <li><b>tipe</b>: <code>mc</code> (pilihan ganda), <code>isian</code>, atau <code>uraian</code> (boleh juga: pg, pilihan ganda, essay).</li>
+            <li><b>pertanyaan</b>: teks soal. Jika berisi koma, Excel/Sheets otomatis memberi tanda kutip.</li>
+            <li><b>opsi_1 … opsi_6</b>: khusus pilihan ganda; isi berurutan tanpa kolom kosong di tengah (minimal 2).</li>
+            <li><b>kunci</b>: pilihan ganda → nomor opsi (1–6) atau huruf A–F; isian → jawaban diterima, variasi dipisah <code>|</code>; uraian → jawaban acuan (boleh kosong).</li>
+            <li><b>acak_opsi</b>: ya/tidak. <b>mode_isian</b>: <code>exact</code> / <code>keywords</code> / <code>manual</code>; <b>kata_kunci</b> dipisah <code>|</code> (mode keywords).</li>
+            <li><b>abaikan_kapital, abaikan_spasi, abaikan_tanda_baca, abaikan_aksen, angka</b>: ya/tidak (bawaan: kapital ya, spasi ya, lainnya tidak).</li>
+            <li><b>rubrik</b>: catatan penilaian untuk uraian. <b>urut</b>: boleh kosong (otomatis berurutan).</li>
+            <li>Gambar tidak dapat diimpor; tambahkan lewat form soal setelah impor. Maksimal 200 soal per berkas.</li></ul></details>
+        </details>
         <div class="scroll"><table id="qTable"></table></div></div>
     </section>
 
     <!-- Hasil -->
     <section id="t-hasil" class="card hide">
-      <div class="row"><select id="hQuiz"></select><button id="btnHasil" class="pr">Tampilkan</button><button id="btnExp1">CSV ringkas</button><button id="btnExp2">CSV detail</button></div>
-      <p id="hStat" class="mu"></p><div class="scroll"><table id="hTable"></table></div>
+      <div class="row"><select id="hQuiz" aria-label="Pilih kuis"></select><button id="btnHasil" class="pr">Tampilkan peringkat</button>
+        <label><input type="checkbox" id="hAuto"> Muat otomatis tiap 3 detik (live)</label><button id="btnExp1">⬇ Unduh nilai (ringkas)</button><button id="btnExp2">⬇ Unduh nilai (detail per soal)</button></div>
+      <p id="hStat" class="mu" role="status"></p><div class="scroll"><table id="hTable"></table></div>
       <h3 id="dTitle" class="hide"></h3><div class="scroll"><table id="dTable"></table></div>
       <h3>Jawaban uraian / manual</h3><div class="scroll"><table id="eTable"></table></div>
     </section>
@@ -104,7 +128,7 @@
 <script src="config/app-config.js"></script>
 <script>
 const C = window.APP_CONFIG, $ = id => document.getElementById(id);
-let token = sessionStorage.getItem('atoken'), quizzes = [], students = [], curQuiz = null, editQuiz = null, editQ = null, qImg = '', monTimer = 0, curLb = null;
+let token = sessionStorage.getItem('atoken'), quizzes = [], students = [], curQuiz = null, editQuiz = null, editQ = null, qImg = '', monTimer = 0, lbTimer = 0, slotSec = 25, editCount = 0, pendingQuiz = null, curLb = null;
 
 async function api(body) {
   const res = await fetch(C.API_URL, { method: 'POST', body: JSON.stringify(Object.assign({ token }, body)) }); // text/plain: tanpa preflight
@@ -121,7 +145,6 @@ const bad = m => Object.assign(new Error(m), { local: true });
 function h(tag, props, ...kids) { const e = document.createElement(tag); Object.assign(e, props || {}); kids.flat().forEach(k => e.append(k)); return e; }
 function fill(table, head, rows) { table.replaceChildren(h('tr', {}, head.map(x => h('th', {}, x)))); rows.forEach(r => table.append(h('tr', {}, r.map(c => h('td', {}, c))))); }
 const btn = (t, f, cls) => h('button', { textContent: t, onclick: f, className: cls || '' });
-const toInput = ms => new Date(ms - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 const fmtTime = ms => ms ? new Date(ms).toLocaleString('id-ID') : '-';
 const val = id => $(id).value.trim();
 
@@ -130,12 +153,12 @@ const TABS = [['ringkasan', 'Ringkasan'], ['siswa', 'Siswa'], ['kuis', 'Kuis & S
 function tab(name) {
   TABS.forEach(([k]) => $('t-' + k).classList.toggle('hide', k !== name));
   [...$('tabs').children].forEach((b, i) => b.classList.toggle('on', TABS[i][0] === name));
-  clearInterval(monTimer); $('mAuto').checked = false;
+  clearInterval(monTimer); clearInterval(lbTimer); $('mAuto').checked = false; $('hAuto').checked = false;
   ({ ringkasan: () => { loadDash(); loadQuizzes(); }, siswa: loadStudents, kuis: loadQuizzes, hasil: loadQuizzes, audit: loadAudit, set: loadSettings })[name]();
 }
 TABS.forEach(([k, t]) => $('tabs').append(btn(t, () => tab(k))));
 function enter(u) { $('s-login').classList.add('hide'); $('app').classList.remove('hide'); $('btnOut').classList.remove('hide'); $('who').textContent = u || ''; tab('ringkasan'); }
-function logout(m) { sessionStorage.removeItem('atoken'); token = null; clearInterval(monTimer); $('app').classList.add('hide'); $('btnOut').classList.add('hide'); $('s-login').classList.remove('hide'); $('msg').textContent = m || ''; }
+function logout(m) { sessionStorage.removeItem('atoken'); token = null; clearInterval(monTimer); clearInterval(lbTimer); $('app').classList.add('hide'); $('btnOut').classList.add('hide'); $('s-login').classList.remove('hide'); $('msg').textContent = m || ''; }
 $('btnOut').onclick = async () => { try { await api({ action: 'logout' }); } catch (e) {} logout('Anda sudah keluar.'); };
 $('btnLogin').onclick = () => run(async () => {
   token = null; const d = await api({ action: 'adminLogin', username: val('un'), password: $('pw').value }); $('pw').value = '';
@@ -144,7 +167,7 @@ $('btnLogin').onclick = () => run(async () => {
 
 /* ---- ringkasan & pemantauan ---- */
 function loadDash() { run(async () => {
-  const d = await api({ action: 'dashboard' });
+  const d = await api({ action: 'dashboard' }); slotSec = d.slotMs / 1000; $('slotInfo').textContent = slotSec;
   $('dash').replaceChildren(...[['Siswa', d.siswa], ['Kuis', d.kuis], ['Draft', d.draft], ['Terjadwal', d.scheduled], ['Berlangsung', d.live], ['Selesai', d.finished], ['Arsip', d.archived], ['Peserta aktif', d.pesertaAktif]].map(([t, v]) => h('div', { className: 'card stat' }, h('b', {}, String(v)), t)));
 }); }
 $('btnDash').onclick = loadDash;
@@ -153,7 +176,7 @@ function monitor() { run(async () => {
   const d = await api({ action: 'liveMonitor', quizId: $('mQuiz').value });
   $('mon').replaceChildren(...[['Status', d.status], ['Soal', d.index ? d.index + '/' + d.total : '-'], ['Peserta berhak', d.peserta], ['Pernah bergabung', d.bergabung], ['Aktif (≤20 dtk)', d.aktif], ['Bergabung terlambat', d.terlambat], ['Sudah menjawab soal ini', d.sudahMenjawab]].map(([t, v]) => h('div', { className: 'card stat' }, h('b', {}, String(v)), t)));
 }); }
-$('btnMon').onclick = monitor;
+$('btnMon').onclick = monitor; $('btnMonLb').onclick = () => openRanking($('mQuiz').value);
 $('mAuto').onchange = () => { clearInterval(monTimer); if ($('mAuto').checked) monTimer = setInterval(monitor, 3000); };
 
 /* ---- siswa ---- */
@@ -184,28 +207,78 @@ $('btnImp').onclick = () => run(async () => {
 
 /* ---- kuis ---- */
 function loadQuizzes() { run(async () => { quizzes = await api({ action: 'listQuizzes' }); drawQuizzes(); }); }
+const faseLabel = { Live: 'Berlangsung', Scheduled: 'Terjadwal', Finished: 'Selesai', draft: 'Draft', archived: 'Arsip' }, faseOrder = { Live: 0, Scheduled: 1, draft: 2, Finished: 3, archived: 4 };
 function drawQuizzes() {
-  fill($('qzTable'), ['Judul', 'Fase', 'Soal', 'Mulai', 'Berakhir', ''], quizzes.map(q => [q.judul + (q.kelas ? ' [' + q.kelas + ']' : ''), q.fase, String(q.jumlahSoal), fmtTime(q.startAt), fmtTime(q.endedAt || q.endAt),
-    h('span', {}, btn('Edit', () => fillQuiz(q)), btn('Soal', () => openQ(q)), btn('Peserta', () => openP(q)), btn('Duplikat', () => run(async () => { await api({ action: 'duplicateQuiz', id: q.id }); ok('Salinan dibuat sebagai draft.'); loadQuizzes(); })),
+  const keepH = $('hQuiz').value, keepM = $('mQuiz').value;
+  quizzes.sort((x, y) => (faseOrder[x.fase] - faseOrder[y.fase]) || (y.startAt - x.startAt));
+  fill($('qzTable'), ['Judul', 'Fase', 'Soal', 'Mulai', 'Berakhir', ''], quizzes.map(q => { const done = q.status !== 'draft' && q.fase !== 'Scheduled'; return [q.judul + (q.kelas ? ' [' + q.kelas + ']' : ''), faseLabel[q.fase] || q.fase, String(q.jumlahSoal), fmtTime(q.startAt), fmtTime(q.endedAt || q.endAt),
+    h('span', {}, btn('Edit', () => fillQuiz(q)), btn('Soal', () => openQ(q)), btn('Peserta', () => openP(q)),
+      done ? btn(q.fase === 'Live' ? 'Peringkat live' : 'Peringkat', () => openRanking(q.id), 'pr') : '', done ? btn('Unduh nilai', () => exportCsv('ringkas', q.id)) : '',
+      btn('Duplikat', () => run(async () => { await api({ action: 'duplicateQuiz', id: q.id }); ok('Salinan dibuat sebagai draft.'); loadQuizzes(); })),
       q.fase === 'Live' ? btn('Akhiri', () => run(async () => { if (!confirm('Akhiri kuis setelah soal berjalan ditutup?')) return; await api({ action: 'endQuizNow', id: q.id }); ok('Kuis akan berakhir setelah soal berjalan.'); loadQuizzes(); }), 'er') : '',
       q.status !== 'archived' && q.fase === 'Finished' ? btn('Arsipkan', () => archive(q)) : '',
-      btn('Hapus', () => run(async () => { if (!confirm('Hapus kuis ini? Hanya bisa jika belum ada data peserta.')) return; await api({ action: 'deleteQuiz', id: q.id }); ok('Kuis dihapus.'); loadQuizzes(); }), 'er'))]));
-  const opts = quizzes.map(q => h('option', { value: q.id, textContent: q.judul }));
-  $('hQuiz').replaceChildren(...opts); $('mQuiz').replaceChildren(...quizzes.map(q => h('option', { value: q.id, textContent: q.judul })));
+      btn('Hapus', () => run(async () => { if (!confirm('Hapus kuis ini? Hanya bisa jika belum ada data peserta.')) return; await api({ action: 'deleteQuiz', id: q.id }); ok('Kuis dihapus.'); loadQuizzes(); }), 'er'))]; }));
+  const opts = () => quizzes.map(q => h('option', { value: q.id, textContent: '[' + (faseLabel[q.fase] || q.fase) + '] ' + q.judul }));
+  $('hQuiz').replaceChildren(...opts()); $('mQuiz').replaceChildren(...opts());
+  if (quizzes.some(q => q.id === keepH)) $('hQuiz').value = keepH; if (quizzes.some(q => q.id === keepM)) $('mQuiz').value = keepM;
+  if (pendingQuiz) { const id = pendingQuiz; pendingQuiz = null; $('hQuiz').value = id; loadRanking(true); }
 }
 function archive(q) { run(async () => { await api(Object.assign(quizBody(q), { action: 'saveQuiz', status: 'archived' })); ok('Kuis diarsipkan.'); loadQuizzes(); }); }
 const quizBody = q => ({ id: q.id, judul: q.judul, deskripsi: q.deskripsi, mapel: q.mapel, kelas: q.kelas, pesertaMode: q.pesertaMode, status: q.status, startAt: q.startAt, endAt: q.endAt, showResults: q.showResults });
 function fillQuiz(q) {
-  editQuiz = q ? q.id : null; $('qzTitle').textContent = q ? 'Edit kuis' : 'Kuis baru';
+  editQuiz = q ? q.id : null; editCount = q ? q.jumlahSoal : 0; $('qzTitle').textContent = q ? 'Edit kuis' : 'Kuis baru';
   $('qzJudul').value = q ? q.judul : ''; $('qzMapel').value = q ? q.mapel : ''; $('qzKelas').value = q ? q.kelas : ''; $('qzDesk').value = q ? q.deskripsi : '';
-  $('qzMode').value = q ? q.pesertaMode : 'semua'; $('qzStatus').value = q ? q.status : 'draft';
-  $('qzStart').value = q ? toInput(q.startAt) : ''; $('qzEnd').value = q ? toInput(q.endAt) : ''; $('qzShow').checked = q ? q.showResults : false;
+  $('qzMode').value = q ? q.pesertaMode : 'semua'; $('qzStatus').value = q ? q.status : 'draft'; $('qzShow').checked = q ? q.showResults : false;
+  writeDT('qzStartD', 'qzStartT', q ? q.startAt : 0); writeDT('qzEndD', 'qzEndT', q ? q.endAt : 0); $('qzDur').value = q ? Math.round((q.endAt - q.startAt) / 60000) : ''; qzSummary();
 }
+/* ---- pemilih tanggal & jam ---- */
+const pad = n => String(n).padStart(2, '0');
+const dStr = ms => { const d = new Date(ms); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }, tStr = ms => { const d = new Date(ms); return pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+const readDT = (d, t) => ($(d).value && $(t).value ? new Date($(d).value + 'T' + $(t).value).getTime() : NaN);
+function writeDT(d, t, ms) { $(d).value = ms ? dStr(ms) : ''; $(t).value = ms ? tStr(ms) : ''; }
+const fmtDur = ms => { const m = Math.ceil(ms / 60000); return m >= 60 ? Math.floor(m / 60) + ' jam ' + (m % 60) + ' menit' : m + ' menit'; };
+function qzSummary() {
+  const s = readDT('qzStartD', 'qzStartT'), e = readDT('qzEndD', 'qzEndT'), el = $('qzSummary'), need = editCount * slotSec * 1000;
+  el.className = 'mu';
+  if (isNaN(s) || isNaN(e)) { el.textContent = 'Pilih tanggal dan jam mulai serta berakhir (atau isi durasi).'; return; }
+  const f = ms => new Date(ms).toLocaleString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  if (e <= s) { el.className = 'err'; el.textContent = 'Waktu berakhir harus setelah waktu mulai.'; return; }
+  let t = 'Mulai ' + f(s) + ' → berakhir ' + f(e) + ' (durasi ' + fmtDur(e - s) + ').';
+  if (editCount > 0 && e - s < need) { el.className = 'err'; t += ' ⚠ Terlalu pendek: ' + editCount + ' soal × ' + slotSec + ' dtk butuh minimal ' + fmtDur(need) + '; soal terakhir akan terpotong.'; }
+  else if (editCount > 0) t += ' ' + editCount + ' soal × ' + slotSec + ' dtk = ' + fmtDur(need) + '.';
+  el.textContent = t;
+}
+function qzSync(src) {
+  const s = readDT('qzStartD', 'qzStartT'), e = readDT('qzEndD', 'qzEndT'), dur = Number($('qzDur').value);
+  if ((src === 'start' || src === 'dur') && !isNaN(s) && dur > 0) writeDT('qzEndD', 'qzEndT', s + dur * 60000);
+  else if (src === 'end' && !isNaN(s) && !isNaN(e)) $('qzDur').value = e > s ? Math.round((e - s) / 60000) : '';
+  qzSummary();
+}
+['qzStartD', 'qzStartT'].forEach(i => $(i).addEventListener('change', () => qzSync('start')));
+['qzEndD', 'qzEndT'].forEach(i => $(i).addEventListener('change', () => qzSync('end')));
+$('qzDur').addEventListener('input', () => qzSync('dur'));
+document.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => { const el = $(b.dataset.pick); try { el.showPicker(); } catch (e) { el.focus(); } });
+document.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => {
+  const d = new Date(); let ms;
+  if (b.dataset.preset === 'tomorrow') { d.setDate(d.getDate() + 1); d.setHours(7, 0, 0, 0); ms = d.getTime(); }
+  else { d.setMinutes(d.getMinutes() + Number(b.dataset.preset) + 1, 0, 0); ms = d.getTime(); }
+  writeDT('qzStartD', 'qzStartT', ms);
+  if (!Number($('qzDur').value)) $('qzDur').value = editCount > 0 ? Math.ceil(editCount * slotSec / 60) + 1 : 15;
+  qzSync('start');
+});
+$('btnAutoEnd').onclick = () => run(async () => {
+  if (isNaN(readDT('qzStartD', 'qzStartT'))) throw bad('Isi tanggal dan jam mulai dulu');
+  if (editCount < 1) throw bad('Kuis belum punya soal. Tambahkan soal dulu, atau isi durasi (menit) secara manual.');
+  $('qzDur').value = Math.ceil(editCount * slotSec / 60) + 1; qzSync('dur');
+});
 $('btnNewQz').onclick = () => fillQuiz(null);
 $('btnSaveQz').onclick = () => run(async () => {
-  if (!$('qzStart').value || !$('qzEnd').value) throw bad('Isi waktu mulai dan berakhir');
+  const s = readDT('qzStartD', 'qzStartT'), e = readDT('qzEndD', 'qzEndT');
+  if (isNaN(s) || isNaN(e)) throw bad('Isi tanggal dan jam mulai serta berakhir');
+  if (e <= s) throw bad('Waktu berakhir harus setelah waktu mulai');
+  if (editCount > 0 && e - s < editCount * slotSec * 1000 && !confirm('Jadwal lebih pendek dari ' + fmtDur(editCount * slotSec * 1000) + '; soal terakhir akan terpotong. Tetap simpan?')) return;
   await api({ action: 'saveQuiz', id: editQuiz, judul: val('qzJudul'), mapel: val('qzMapel'), kelas: val('qzKelas'), deskripsi: val('qzDesk'), pesertaMode: $('qzMode').value, status: $('qzStatus').value,
-    showResults: $('qzShow').checked, startAt: new Date($('qzStart').value).getTime(), endAt: new Date($('qzEnd').value).getTime() });
+    showResults: $('qzShow').checked, startAt: s, endAt: e });
   ok('Kuis disimpan.'); fillQuiz(null); loadQuizzes();
 });
 
@@ -260,36 +333,106 @@ $('btnSaveQ').onclick = () => run(async () => {
   await api(body); ok('Soal disimpan.'); newQ(); loadQ();
 });
 
-/* ---- hasil, rincian, koreksi ---- */
-$('btnHasil').onclick = () => run(async () => {
+/* ---- hasil: peringkat live / selesai, rincian, koreksi, unduh ---- */
+function openRanking(id) { if (!id) return; pendingQuiz = id; tab('hasil'); }
+const medal = r => (r === 1 ? '🥇 ' : r === 2 ? '🥈 ' : r === 3 ? '🥉 ' : '') + r;
+function loadRanking(first) { return run(async () => {
   const quizId = $('hQuiz').value; if (!quizId) return;
   const d = await api({ action: 'leaderboard', quizId }); curLb = d;
-  $('hStat').textContent = d.final ? 'Hasil FINAL' : 'Hasil SEMENTARA (kuis belum selesai atau ada jawaban yang belum diperiksa)';
-  fill($('hTable'), ['#', 'NIM', 'Nama', 'Total', 'Benar', 'Salah', 'Kosong', 'Pending', 'Waktu (ms)', ''], d.rows.map(r => [String(r.rank), r.nim, r.nama, r.skor.toFixed(2), String(r.benar), String(r.salah || 0), String(r.kosong || 0), String(r.pending || 0), String(r.totalMs), btn('Rincian', () => detail(quizId, r))]));
-  $('dTitle').classList.add('hide'); $('dTable').replaceChildren();
-  const es = await api({ action: 'listEssays', quizId });
-  fill($('eTable'), ['Nama', 'Soal / acuan / rubrik', 'Jawaban', 'Saran', 'Status', ''], es.map(e => [e.nama, e.soal + (e.acuan ? ' | acuan: ' + e.acuan : '') + (e.rubrik ? ' | rubrik: ' + e.rubrik : ''), e.jawaban, e.saranKataKunci,
-    e.benar === 'pending' ? 'Belum diperiksa' : e.benar ? 'Benar' : 'Salah', h('span', {}, btn('Benar', () => grade(quizId, e, true)), btn('Salah', () => grade(quizId, e, false), 'er'))]));
-});
+  const prog = d.progress ? ' · soal selesai dinilai ' + d.progress.selesai + '/' + d.progress.total : '', clock = ' · diperbarui ' + new Date().toLocaleTimeString('id-ID');
+  $('hStat').className = d.status === 'Live' ? 'live' : 'mu';
+  $('hStat').textContent = d.status === 'Live' ? '🔴 LIVE — peringkat sementara' + prog + clock
+    : d.final ? '✅ Hasil FINAL' + prog : 'Hasil SEMENTARA (' + (d.status === 'Finished' ? 'masih ada jawaban yang belum diperiksa' : 'kuis belum dimulai') + ')' + prog;
+  fill($('hTable'), ['#', 'NIM', 'Nama', 'Total', 'Benar', 'Salah', 'Kosong', 'Pending', 'Waktu (ms)', ''], d.rows.map(r => [medal(r.rank), r.nim, r.nama, r.skor.toFixed(2), String(r.benar), String(r.salah || 0), String(r.kosong || 0), String(r.pending || 0), String(r.totalMs), btn('Rincian', () => detail(quizId, r))]));
+  if (first && d.status === 'Live' && !$('hAuto').checked) { $('hAuto').checked = true; $('hAuto').onchange(); }
+  if (d.status !== 'Live' && $('hAuto').checked) { $('hAuto').checked = false; clearInterval(lbTimer); }
+  if (first) { $('dTitle').classList.add('hide'); $('dTable').replaceChildren(); }
+  if (d.status === 'Finished') {
+    const es = await api({ action: 'listEssays', quizId });
+    fill($('eTable'), ['Nama', 'Soal / acuan / rubrik', 'Jawaban', 'Saran', 'Status', ''], es.map(e => [e.nama, e.soal + (e.acuan ? ' | acuan: ' + e.acuan : '') + (e.rubrik ? ' | rubrik: ' + e.rubrik : ''), e.jawaban, e.saranKataKunci,
+      e.benar === 'pending' ? 'Belum diperiksa' : e.benar ? 'Benar' : 'Salah', h('span', {}, btn('Benar', () => grade(quizId, e, true)), btn('Salah', () => grade(quizId, e, false), 'er'))]));
+  } else $('eTable').replaceChildren();
+}); }
+$('btnHasil').onclick = () => loadRanking(true);
+$('hAuto').onchange = () => { clearInterval(lbTimer); if ($('hAuto').checked) lbTimer = setInterval(() => loadRanking(false), 3000); };
 function detail(quizId, r) { run(async () => {
   const rows = await api({ action: 'listResults', quizId, userId: r.userId });
   $('dTitle').classList.remove('hide'); $('dTitle').textContent = 'Rincian: ' + r.nama;
   fill($('dTable'), ['No', 'Status', 'Urutan', 'N benar', 'Nilai', 'Finalisasi', ''], rows.map(x => [String(x.no), x.status, x.urutan === '' ? '-' : String(x.urutan), String(x.nBenar), x.nilai.toFixed(2), x.final,
     btn('Koreksi', () => run(async () => {
       const v = prompt('Nilai baru (0–10):', x.nilai); if (v === null) return; const reason = prompt('Alasan koreksi (wajib):'); if (!reason) return;
-      await api({ action: 'adjustScore', quizId, questionId: x.questionId, userId: x.userId, nilai: Number(String(v).replace(',', '.')), reason }); ok('Nilai dikoreksi & tercatat di audit log.'); $('btnHasil').click();
+      await api({ action: 'adjustScore', quizId, questionId: x.questionId, userId: x.userId, nilai: Number(String(v).replace(',', '.')), reason }); ok('Nilai dikoreksi & tercatat di audit log.'); loadRanking(true);
     }))]));
 }); }
 function grade(quizId, e, benar) { run(async () => {
   const reason = prompt('Alasan penilaian (wajib, min. 5 karakter):'); if (!reason) return;
-  await api({ action: 'gradeEssay', quizId, questionId: e.questionId, userId: e.userId, benar, reason }); ok('Tersimpan; nilai soal dihitung ulang.'); $('btnHasil').click();
+  await api({ action: 'gradeEssay', quizId, questionId: e.questionId, userId: e.userId, benar, reason }); ok('Tersimpan; nilai soal dihitung ulang.'); loadRanking(true);
 }); }
-function exportCsv(mode) { run(async () => {
-  const d = await api({ action: 'exportResults', quizId: $('hQuiz').value, mode });
-  const a = h('a', { href: URL.createObjectURL(new Blob(['\ufeff' + d.csv], { type: 'text/csv;charset=utf-8' })), download: d.filename }); // BOM: Excel membaca UTF-8
-  document.body.append(a); a.click(); a.remove();
-}); }
+function saveFile(name, text) { const a = h('a', { href: URL.createObjectURL(new Blob(['\ufeff' + text], { type: 'text/csv;charset=utf-8' })), download: name }); document.body.append(a); a.click(); a.remove(); } // BOM: Excel membaca UTF-8
+function exportCsv(mode, id) { run(async () => { const d = await api({ action: 'exportResults', quizId: id || $('hQuiz').value, mode }); saveFile(d.filename, d.csv); ok('Berkas ' + d.filename + ' diunduh.'); }); }
 $('btnExp1').onclick = () => exportCsv('ringkas'); $('btnExp2').onclick = () => exportCsv('detail');
+
+/* ---- impor soal dari CSV + template ---- */
+/*CSV-BEGIN*/
+const Q_HEAD = ['urut', 'tipe', 'pertanyaan', 'opsi_1', 'opsi_2', 'opsi_3', 'opsi_4', 'opsi_5', 'opsi_6', 'kunci', 'acak_opsi', 'mode_isian', 'kata_kunci', 'abaikan_kapital', 'abaikan_spasi', 'abaikan_tanda_baca', 'abaikan_aksen', 'angka', 'rubrik'];
+function parseCsv(text) {
+  text = String(text).replace(/^\ufeff/, '');
+  const first = text.split(/\r?\n/, 1)[0], delim = (first.match(/;/g) || []).length > (first.match(/,/g) || []).length ? ';' : ',';
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += c; }
+    else if (c === '"' && cell === '') q = true;
+    else if (c === delim) { row.push(cell); cell = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += c;
+  }
+  if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter(r => r.some(c => c.trim() !== ''));
+}
+function toCsv(rows) { const esc = c => { const s = String(c === undefined || c === null ? '' : c); return /[",;\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return rows.map(r => r.map(esc).join(',')).join('\r\n'); }
+const TIPE = { mc: 'mc', pg: 'mc', 'pilihan ganda': 'mc', pilihan_ganda: 'mc', isian: 'isian', 'isian singkat': 'isian', uraian: 'uraian', essay: 'uraian', esai: 'uraian' };
+function rowsToQuestions(rows) {
+  if (rows.length < 2) throw new Error('Berkas kosong atau hanya berisi judul kolom');
+  const head = rows[0].map(x => x.trim().toLowerCase().replace(/[\s-]+/g, '_')), idx = n => head.indexOf(n);
+  ['tipe', 'pertanyaan'].forEach(n => { if (idx(n) < 0) throw new Error('Kolom "' + n + '" tidak ditemukan. Gunakan template yang disediakan.'); });
+  return rows.slice(1).map((r, i) => {
+    const g = n => (idx(n) >= 0 ? String(r[idx(n)] === undefined ? '' : r[idx(n)]).trim() : '');
+    const yn = (n, d) => { const v = g(n).toLowerCase(); return v === '' ? d : ['ya', 'y', 'iya', 'true', '1', 'benar'].includes(v); };
+    const tipe = TIPE[g('tipe').toLowerCase()] || g('tipe').toLowerCase();
+    const opsi = [1, 2, 3, 4, 5, 6].map(k => g('opsi_' + k)).filter(Boolean).map(text => ({ text }));
+    let kunci = g('kunci');
+    if (tipe === 'mc') { const m = /^[A-Fa-f]$/.test(kunci) ? kunci.toUpperCase().charCodeAt(0) - 64 : Number(kunci); kunci = Number.isInteger(m) ? 'o' + m : 'o?'; }
+    const q = { baris: i + 2, urut: Number(g('urut')) || 0, tipe, teks: g('pertanyaan'), opsi, acakOpsi: yn('acak_opsi', false), kunci, rubrik: g('rubrik') };
+    if (tipe === 'isian') q.aturan = { mode: g('mode_isian').toLowerCase() || 'exact', kataKunci: g('kata_kunci').split('|').map(x => x.trim()).filter(Boolean),
+      ignoreCase: yn('abaikan_kapital', true), ignoreSpaces: yn('abaikan_spasi', true), ignorePunct: yn('abaikan_tanda_baca', false), ignoreDiacritics: yn('abaikan_aksen', false), numeric: yn('angka', false) };
+    return q;
+  });
+}
+function templateRows() {
+  return [Q_HEAD,
+    [1, 'mc', 'Ibu kota Indonesia saat ini (sebelum IKN) adalah ...', 'Bandung', 'Jakarta', 'Surabaya', 'Medan', '', '', 2, 'ya', '', '', '', '', '', '', '', ''],
+    [2, 'isian', 'Hasil dari 3 + 4 adalah ...', '', '', '', '', '', '', '7', '', 'exact', '', 'ya', 'ya', 'tidak', 'tidak', 'ya', ''],
+    [3, 'isian', 'Proses tumbuhan membuat makanan dengan cahaya disebut ... (satu kata)', '', '', '', '', '', '', 'fotosintesis|fotosintesa', '', 'exact', '', 'ya', 'ya', 'ya', 'ya', 'tidak', ''],
+    [4, 'uraian', 'Jelaskan secara singkat proses fotosintesis.', '', '', '', '', '', '', 'Tumbuhan mengubah cahaya, air, dan CO2 menjadi glukosa dan oksigen.', '', '', '', '', '', '', '', '', 'Skor penuh bila menyebut cahaya, klorofil, dan glukosa']];
+}
+function questionsToRows(list) {
+  return [Q_HEAD].concat(list.map(x => { const o = [0, 1, 2, 3, 4, 5].map(i => (x.opsi[i] ? x.opsi[i].text : '')), a = x.aturan || {}, yn = v => (v ? 'ya' : 'tidak');
+    return [x.urut, x.tipe, x.teks, ...o, x.tipe === 'mc' ? x.opsi.findIndex(p => p.id === x.kunci) + 1 : x.kunci, x.tipe === 'mc' ? yn(x.acakOpsi) : '', x.tipe === 'isian' ? a.mode : '', x.tipe === 'isian' ? (a.kataKunci || []).join('|') : '',
+      x.tipe === 'isian' ? yn(a.ignoreCase) : '', x.tipe === 'isian' ? yn(a.ignoreSpaces) : '', x.tipe === 'isian' ? yn(a.ignorePunct) : '', x.tipe === 'isian' ? yn(a.ignoreDiacritics) : '', x.tipe === 'isian' ? yn(a.numeric) : '', x.rubrik || '']; }));
+}
+/*CSV-END*/
+$('btnTpl').onclick = () => saveFile('template-soal.csv', toCsv(templateRows()));
+$('btnExpQ').onclick = () => run(async () => { const list = await api({ action: 'listQuestions', quizId: curQuiz.id }); saveFile('soal-' + (curQuiz.judul || 'kuis').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30) + '.csv', toCsv(questionsToRows(list))); ok('Soal diunduh (maks. 6 opsi per soal pada berkas).'); });
+$('btnImpQ').onclick = () => run(async () => {
+  const f = $('qCsv').files[0]; if (!f) throw bad('Pilih berkas CSV dulu');
+  const mode = document.querySelector('input[name=impMode]:checked').value;
+  if (mode === 'ganti' && !confirm('Semua soal kuis ini akan DIHAPUS dan diganti isi berkas. Lanjutkan?')) return;
+  let rows; try { rows = rowsToQuestions(parseCsv(await f.text())); } catch (e) { throw bad(e.message); }
+  const d = await api({ action: 'importQuestions', quizId: curQuiz.id, mode, rows }), box = $('impQRes');
+  if (d.errors.length) { box.className = 'err'; box.replaceChildren(h('b', {}, 'Tidak ada soal yang disimpan. Perbaiki ' + (d.totalError || d.errors.length) + ' baris berikut lalu impor ulang:'), h('ul', {}, d.errors.map(e => h('li', { textContent: 'Baris ' + e.baris + ': ' + e.pesan })))); return; }
+  box.className = 'mu'; box.textContent = '✔ ' + d.added + ' soal berhasil diimpor.'; $('qCsv').value = ''; ok(d.added + ' soal diimpor.'); loadQuizzes(); loadQ();
+});
 
 /* ---- audit ---- */
 function loadAudit() { run(async () => {
