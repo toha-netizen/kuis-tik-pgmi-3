@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kuis Kelas</title>
+<style>
+  :root{--bg:#f5f6fa;--card:#fff;--tx:#1d2433;--mu:#6b7385;--pr:#3b5bdb;--ok:#2f9e44;--er:#e03131;--wn:#e8890c;--bd:#dde1ea}
+  @media (prefers-color-scheme:dark){:root{--bg:#12151c;--card:#1b2030;--tx:#e8ebf3;--mu:#98a1b5;--pr:#7c93ff;--bd:#2c3347}}
+  *{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--tx)}
+  main{max-width:600px;margin:0 auto;padding:16px}.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:18px;margin-top:14px}
+  input,button{font:inherit;width:100%;padding:12px;border-radius:10px;border:1px solid var(--bd);background:var(--card);color:var(--tx);margin-top:8px}
+  button{cursor:pointer}button.pr{background:var(--pr);color:#fff;border:0}button:disabled{opacity:.5;cursor:not-allowed}.opt.sel{outline:3px solid var(--pr)}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}.mu{color:var(--mu);font-size:14px}.err{color:var(--er)}.hide{display:none}
+  .badge{font-size:12px;padding:2px 10px;border-radius:99px;border:1px solid var(--bd)}.badge.Live{color:var(--ok);border-color:var(--ok)}.badge.Scheduled{color:var(--wn);border-color:var(--wn)}
+  .bar{height:10px;background:var(--bd);border-radius:6px;overflow:hidden}.bar i{display:block;height:100%;background:var(--pr);width:100%}
+  #timer{font-size:46px;font-weight:700;text-align:center}img.qimg{max-width:100%;max-height:240px;border-radius:10px;display:block;margin:8px auto}
+  table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px;border-bottom:1px solid var(--bd);text-align:left}tr.me{font-weight:700;background:rgba(59,91,219,.1)}
+  .sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;text-align:center}.sum b{display:block;font-size:22px}
+</style>
+</head>
+<body>
+<main>
+  <div class="row"><b>Kuis Kelas</b><span class="row"><span id="conn" title="Koneksi" aria-label="Indikator koneksi">●</span><button id="btnOut" class="hide" style="width:auto;margin:0">Keluar</button></span></div>
+
+  <section id="v-login" class="card"><h2>Masuk</h2>
+    <input id="nim" placeholder="NIM" autocomplete="username" inputmode="numeric"><input id="pin" placeholder="PIN" type="password" autocomplete="current-password">
+    <button class="pr" id="btnLogin">Masuk</button><p id="loginMsg" class="err" role="alert"></p></section>
+
+  <section id="v-dash" class="hide"><h2 id="hello"></h2><p id="dashMsg" class="err" role="alert"></p><div id="list"></div></section>
+
+  <section id="v-wait" class="card hide"><h2 id="waitTitle"></h2><p id="waitMsg"></p><div id="waitCount" style="font-size:36px;font-weight:700"></div><button id="btnWaitBack">Kembali ke daftar kuis</button></section>
+
+  <section id="v-quiz" class="card hide" aria-live="polite">
+    <div class="row"><b id="qzTitle"></b><span id="sendState" class="mu"></span></div>
+    <div class="row mu"><span id="qno"></span><span id="lateNote"></span></div>
+    <div class="bar"><i id="barFill"></i></div><div id="timer" aria-label="Sisa waktu">4.0</div>
+    <img id="qimg" class="qimg hide" alt="Gambar soal">
+    <h2 id="qtext"></h2><div id="opts"></div>
+    <div id="textAns" class="hide"><input id="txt" placeholder="Jawaban Anda" autocomplete="off"><button class="pr" id="btnSend">Kirim</button></div>
+  </section>
+
+  <section id="v-result" class="hide">
+    <div class="card"><h2 id="rTitle">Hasil</h2><p id="rMsg" class="mu"></p><div id="rSum" class="sum"></div></div>
+    <div class="card"><h3>Rincian per soal</h3><div style="overflow-x:auto"><table id="rDetail"></table></div></div>
+    <div class="card"><h3>Papan peringkat</h3><div style="overflow-x:auto"><table id="rLb"></table></div></div>
+    <button id="btnResBack">Kembali ke daftar kuis</button>
+  </section>
+</main>
+
+<script src="config/app-config.js"></script>
+<script>
+const C = window.APP_CONFIG, $ = id => document.getElementById(id), IMG_RE = /^https:\/\/lh3\.googleusercontent\.com\/d\/[\w-]+$/;
+let token = sessionStorage.getItem('token'), offset = 0, quizId = null, snap = null, answeredQ = null, T = { poll: 0, dash: 0, sec: 0, raf: 0 }, curQid = null;
+const now = () => Date.now() + offset, fmt = ms => new Date(ms).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+function h(tag, props, ...kids) { const e = document.createElement(tag); Object.assign(e, props || {}); kids.flat().forEach(k => e.append(k)); return e; }
+
+async function api(body) {
+  const res = await fetch(C.API_URL, { method: 'POST', body: JSON.stringify(Object.assign({ token }, body)) }); // text/plain: tanpa preflight CORS
+  const j = await res.json();
+  if (!j.success) { const e = new Error(j.message); e.code = j.error; throw e; }
+  return j.data;
+}
+function show(v) {
+  ['login', 'dash', 'wait', 'quiz', 'result'].forEach(x => $('v-' + x).classList.toggle('hide', x !== v));
+  $('btnOut').classList.toggle('hide', v === 'login');
+  if (v !== 'quiz' && v !== 'wait') { clearInterval(T.poll); cancelAnimationFrame(T.raf); }
+  if (v !== 'dash') { clearInterval(T.dash); clearInterval(T.sec); }
+}
+function syncClock(d, t0) { offset = d.serverNow - (t0 + Date.now()) / 2; } // koreksi selisih jam: server membalas di tengah RTT
+function conn(ok) { $('conn').style.color = ok === true ? 'var(--ok)' : ok === 'warn' ? 'var(--wn)' : 'var(--er)'; }
+
+/* ---------- login ---------- */
+$('btnLogin').onclick = async () => {
+  $('loginMsg').textContent = '';
+  try {
+    token = null; const d = await api({ action: 'login', nim: $('nim').value.trim(), pin: $('pin').value });
+    token = d.token; sessionStorage.setItem('token', token); $('pin').value = ''; toDash();
+  } catch (e) { $('loginMsg').textContent = e.code ? e.message : 'Koneksi gagal, coba lagi'; }
+};
+function logout(msg) { sessionStorage.clear(); token = null; show('login'); $('loginMsg').textContent = msg || ''; }
+$('btnOut').onclick = async () => { try { await api({ action: 'logout' }); } catch (e) {} logout(''); };
+function fail(e, target) {
+  if (e.code === 'SESSION_EXPIRED') return logout('Sesi berakhir, silakan masuk lagi.');
+  conn(e.code === 'RATE_LIMIT' || e.code === 'BUSY' ? 'warn' : false);
+  if (target) target.textContent = e.code ? e.message : 'Koneksi gagal, mencoba lagi…';
+}
+
+/* ---------- dashboard: daftar kuis, jadwal, detail ---------- */
+function toDash() { show('dash'); loadDash(); T.dash = setInterval(loadDash, 5000); T.sec = setInterval(tickDash, 1000); }
+async function loadDash() {
+  const t0 = Date.now();
+  try { const d = await api({ action: 'myQuizzes' }); syncClock(d, t0); conn(true); $('dashMsg').textContent = ''; drawDash(d); }
+  catch (e) { fail(e, $('dashMsg')); }
+}
+function drawDash(d) {
+  $('hello').textContent = 'Halo, ' + d.nama;
+  const box = $('list'); box.replaceChildren();
+  if (!d.kuis.length) box.append(h('p', { className: 'mu', textContent: 'Belum ada kuis untuk Anda.' }));
+  d.kuis.forEach(k => {
+    const lab = { Live: 'Sedang berlangsung', Scheduled: 'Terjadwal', Finished: 'Selesai' }[k.status];
+    const soon = k.status === 'Scheduled' && k.startAt - now() <= 120000;
+    let act;
+    if (k.status === 'Live' || soon) act = h('button', { className: 'pr', textContent: k.status === 'Live' ? 'Masuk ruang kuis' : 'Masuk ruang tunggu', onclick: () => enterRoom(k.id, k.judul) });
+    else if (k.status === 'Scheduled') act = h('button', { disabled: true, textContent: 'Menunggu jadwal' });
+    else if (k.hasilTersedia) act = h('button', { textContent: 'Lihat hasil', onclick: () => showResult(k.id, k.judul) });
+    else act = h('p', { className: 'mu', textContent: 'Hasil akan diumumkan oleh guru.' });
+    const cd = k.status === 'Scheduled' ? h('div', { className: 'mu' }, 'Mulai dalam ', h('b', { className: 'cd' }, ''), ) : '';
+    if (cd) cd.querySelector('.cd').dataset.start = k.startAt;
+    box.append(h('div', { className: 'card' }, h('div', { className: 'row' }, h('b', { textContent: k.judul }), h('span', { className: 'badge ' + k.status, textContent: lab })),
+      k.mapel ? h('div', { className: 'mu', textContent: k.mapel }) : '', k.deskripsi ? h('p', { textContent: k.deskripsi }) : '',
+      h('div', { className: 'mu', textContent: 'Mulai ' + fmt(k.startAt) + ' · Berakhir ' + fmt(k.endAt) + ' · ' + k.jumlahSoal + ' soal · 4 detik per soal' }), cd, act));
+  });
+  tickDash();
+}
+function tickDash() {
+  document.querySelectorAll('.cd').forEach(el => {
+    const s = Math.max(0, Math.ceil((el.dataset.start - now()) / 1000));
+    el.textContent = s >= 3600 ? Math.floor(s / 3600) + ' jam ' + Math.floor(s % 3600 / 60) + ' menit' : Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+    if (s === 0 && !el.dataset.done) { el.dataset.done = 1; loadDash(); }
+  });
+}
+
+/* ---------- ruang kuis ---------- */
+function enterRoom(id, judul) { quizId = id; snap = null; answeredQ = null; curQid = null; $('qzTitle').textContent = judul; $('waitTitle').textContent = judul; $('waitMsg').textContent = 'Menghubungkan…'; $('waitCount').textContent = ''; show('wait'); poll(); T.poll = setInterval(poll, C.POLL_MS); T.raf = requestAnimationFrame(tick); }
+$('btnWaitBack').onclick = toDash;
+async function poll() {
+  const t0 = Date.now();
+  try { const d = await api({ action: 'snapshot', quizId }); syncClock(d, t0); snap = d; conn(true); render(d); }
+  catch (e) {
+    if (e.code === 'NOT_ELIGIBLE' || e.code === 'NOT_FOUND') { toDash(); $('dashMsg').textContent = e.message; }
+    else fail(e, null);
+  }
+}
+function render(d) {
+  if (d.status === 'Scheduled') { show('wait'); $('waitMsg').textContent = 'Kuis dimulai pada ' + fmt(d.quizStart) + '. Tetap di halaman ini.'; return; }
+  if (d.status === 'Finished') { const id = quizId; showResult(id, d.judul); return; }
+  if ($('v-quiz').classList.contains('hide')) { $('v-quiz').classList.remove('hide'); $('v-wait').classList.add('hide'); }
+  $('qno').textContent = 'Soal ' + d.index + ' / ' + d.total;
+  $('lateNote').textContent = d.participation && d.participation.lateJoin && d.index - 1 === d.participation.joinedIdx ? 'Bergabung di tengah kuis' : '';
+  const q = d.question;
+  if (curQid !== q.id) { // render ulang hanya saat soal berganti
+    curQid = q.id; $('qtext').textContent = q.teks; $('sendState').textContent = ''; $('txt').value = '';
+    const img = $('qimg'); if (q.gambar && IMG_RE.test(q.gambar)) { img.src = q.gambar; img.classList.remove('hide'); } else { img.removeAttribute('src'); img.classList.add('hide'); }
+    const box = $('opts'); box.replaceChildren(); $('textAns').classList.toggle('hide', q.tipe === 'mc');
+    if (q.tipe === 'mc') q.opsi.forEach(o => box.append(h('button', { className: 'opt', textContent: o.text, onclick: ev => send(q.id, o.id, ev.currentTarget) })));
+    $('txt').placeholder = q.tipe === 'uraian' ? 'Tulis jawaban uraian Anda' : 'Jawaban Anda';
+  }
+  if (d.answered) { lock(true); $('sendState').textContent = '✓ Terkirim'; answeredQ = q.id; } else if (answeredQ !== q.id) lock(false);
+}
+function lock(on) { document.querySelectorAll('#opts button,#btnSend').forEach(b => b.disabled = on); }
+$('btnSend').onclick = () => send(snap.question.id, $('txt').value.trim(), null);
+async function send(qid, jawaban, btn) {
+  if (answeredQ === qid || !jawaban) return;
+  answeredQ = qid; lock(true); if (btn) btn.classList.add('sel'); $('sendState').textContent = 'Mengirim…';
+  try { await api({ action: 'answer', quizId, questionId: qid, jawaban }); $('sendState').textContent = '✓ Terkirim'; }
+  catch (e) {
+    if (e.code === 'DUPLICATE') $('sendState').textContent = '✓ Terkirim';
+    else if (e.code === 'QUESTION_CLOSED' || e.code === 'QUIZ_ENDED') $('sendState').textContent = 'Waktu habis';
+    else if (e.code === 'SESSION_EXPIRED') fail(e);
+    else if (e.code === 'BUSY' || e.code === 'RATE_LIMIT' || !e.code) { answeredQ = null; lock(false); if (btn) btn.classList.remove('sel'); $('sendState').textContent = 'Gagal kirim, coba lagi'; }
+    else $('sendState').textContent = e.message;
+  }
+}
+function tick() { // timer lokal dari jam server (bukan jam perangkat)
+  if (snap) {
+    if (snap.status === 'Scheduled') { const s = Math.max(0, Math.ceil((snap.quizStart - now()) / 1000)); $('waitCount').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+    else if (snap.status === 'Live') { const left = Math.max(0, snap.qEnd - now()); $('timer').textContent = (left / 1000).toFixed(1); $('barFill').style.width = Math.min(100, left / 40) + '%'; if (left === 0) lock(true); }
+  }
+  T.raf = requestAnimationFrame(tick);
+}
+
+/* ---------- hasil ---------- */
+$('btnResBack').onclick = toDash;
+function fill(table, head, rows, meIdx) {
+  table.replaceChildren(h('tr', {}, head.map(x => h('th', { textContent: x }))));
+  rows.forEach((r, i) => table.append(h('tr', { className: i === meIdx ? 'me' : '' }, r.map(c => h('td', { textContent: String(c) })))));
+}
+async function showResult(id, judul) {
+  show('result'); $('rTitle').textContent = 'Hasil: ' + judul; $('rMsg').textContent = 'Memuat…'; $('rSum').replaceChildren(); fill($('rDetail'), [], []); fill($('rLb'), [], []);
+  try {
+    const [me, lb] = await Promise.all([api({ action: 'myResult', quizId: id }), api({ action: 'leaderboard', quizId: id })]);
+    $('rMsg').textContent = me.final ? 'Hasil final.' : 'Hasil sementara: sebagian jawaban uraian masih diperiksa guru.';
+    if (me.ringkas) {
+      const r = me.ringkas; $('rSum').replaceChildren(...[['Total', r.total.toFixed(2)], ['Peringkat', r.peringkat + '/' + me.peserta], ['Benar', r.benar], ['Salah', r.salah], ['Kosong', r.kosong]].map(([t, v]) => h('div', {}, h('b', { textContent: String(v) }), t)));
+    } else $('rMsg').textContent += ' Anda tidak tercatat memiliki nilai pada kuis ini.';
+    const lab = { benar: 'Benar', salah: 'Salah', kosong: 'Tidak menjawab', pending: 'Menunggu pemeriksaan' };
+    fill($('rDetail'), ['No', 'Status', 'Urutan', 'Nilai'], me.soal.map(s => [s.no, lab[s.status] || s.status, s.urutan === '' ? '-' : s.urutan + ' dari ' + s.jumlahBenar, Number(s.nilai).toFixed(2)]));
+    fill($('rLb'), ['#', 'Nama', 'Nilai', 'Benar'], lb.rows.map(r => [r.rank, r.nama, Number(r.skor).toFixed(2), r.benar]), lb.rows.findIndex(r => r.saya));
+  } catch (e) {
+    if (e.code === 'SESSION_EXPIRED') return fail(e);
+    $('rMsg').textContent = e.code === 'FORBIDDEN' ? 'Hasil akan diumumkan oleh guru.' : e.code === 'NOT_FINISHED' ? 'Kuis belum selesai.' : e.code ? e.message : 'Gagal memuat hasil. Periksa koneksi.';
+  }
+}
+
+if (token) toDash(); else show('login');
+</script>
+</body>
+</html>
