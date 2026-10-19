@@ -51,7 +51,7 @@
 <script src="config/app-config.js"></script>
 <script>
 const C = window.APP_CONFIG, $ = id => document.getElementById(id), IMG_RE = /^https:\/\/lh3\.googleusercontent\.com\/d\/[\w-]+$/;
-let token = sessionStorage.getItem('token'), offset = 0, quizId = null, snap = null, answeredQ = null, T = { poll: 0, dash: 0, sec: 0, raf: 0 }, curQid = null;
+let slotMs = 25000, token = sessionStorage.getItem('token'), offset = 0, quizId = null, snap = null, answeredQ = null, T = { poll: 0, dash: 0, sec: 0, raf: 0 }, curQid = null;
 const now = () => Date.now() + offset, fmt = ms => new Date(ms).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
 function h(tag, props, ...kids) { const e = document.createElement(tag); Object.assign(e, props || {}); kids.flat().forEach(k => e.append(k)); return e; }
 
@@ -90,7 +90,7 @@ function fail(e, target) {
 function toDash() { show('dash'); loadDash(); T.dash = setInterval(loadDash, 5000); T.sec = setInterval(tickDash, 1000); }
 async function loadDash() {
   const t0 = Date.now();
-  try { const d = await api({ action: 'myQuizzes' }); syncClock(d, t0); conn(true); $('dashMsg').textContent = ''; drawDash(d); }
+  try { const d = await api({ action: 'myQuizzes' }); syncClock(d, t0); slotMs = d.slotMs || slotMs; conn(true); $('dashMsg').textContent = ''; drawDash(d); }
   catch (e) { fail(e, $('dashMsg')); }
 }
 function drawDash(d) {
@@ -109,7 +109,7 @@ function drawDash(d) {
     if (cd) cd.querySelector('.cd').dataset.start = k.startAt;
     box.append(h('div', { className: 'card' }, h('div', { className: 'row' }, h('b', { textContent: k.judul }), h('span', { className: 'badge ' + k.status, textContent: lab })),
       k.mapel ? h('div', { className: 'mu', textContent: k.mapel }) : '', k.deskripsi ? h('p', { textContent: k.deskripsi }) : '',
-      h('div', { className: 'mu', textContent: 'Mulai ' + fmt(k.startAt) + ' · Berakhir ' + fmt(k.endAt) + ' · ' + k.jumlahSoal + ' soal · 25 detik per soal' }), cd, act));
+      h('div', { className: 'mu', textContent: 'Mulai ' + fmt(k.startAt) + ' · Berakhir ' + fmt(k.endAt) + ' · ' + k.jumlahSoal + ' soal · ' + Math.round(slotMs / 1000) + ' detik per soal' }), cd, act));
   });
   tickDash();
 }
@@ -165,7 +165,7 @@ async function send(qid, jawaban, btn) {
 function tick() { // timer lokal dari jam server (bukan jam perangkat)
   if (snap) {
     if (snap.status === 'Scheduled') { const s = Math.max(0, Math.ceil((snap.quizStart - now()) / 1000)); $('waitCount').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
-    else if (snap.status === 'Live') { const left = Math.max(0, snap.qEnd - now()); $('timer').textContent = (left / 1000).toFixed(1); $('barFill').style.width = Math.min(100, left / 250) + '%'; if (left === 0) lock(true); }
+    else if (snap.status === 'Live') { const left = Math.max(0, snap.qEnd - now()); $('timer').textContent = (left / 1000).toFixed(1); $('barFill').style.width = Math.min(100, left / Math.max(1, snap.qEnd - snap.qStart) * 100) + '%'; if (left === 0) lock(true); }
   }
   T.raf = requestAnimationFrame(tick);
 }
