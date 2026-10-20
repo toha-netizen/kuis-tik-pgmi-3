@@ -34,7 +34,7 @@
   <section id="v-quiz" class="card hide" aria-live="polite">
     <div class="row"><b id="qzTitle"></b><span id="sendState" class="mu"></span></div>
     <div class="row mu"><span id="qno"></span><span id="lateNote"></span></div>
-    <div class="bar"><i id="barFill"></i></div><div id="timer" aria-label="Sisa waktu">4.0</div>
+    <div class="bar"><i id="barFill"></i></div><div id="timer" aria-label="Sisa waktu dalam detik">0</div>
     <img id="qimg" class="qimg hide" alt="Gambar soal">
     <h2 id="qtext"></h2><div id="opts"></div>
     <div id="textAns" class="hide"><input id="txt" placeholder="Jawaban Anda" autocomplete="off"><button class="pr" id="btnSend">Kirim</button></div>
@@ -162,10 +162,10 @@ async function send(qid, jawaban, btn) {
     else $('sendState').textContent = e.message;
   }
 }
-function tick() { // timer lokal dari jam server (bukan jam perangkat)
+function tick() { // timer lokal dari jam server (bukan jam perangkat); tampilan detik utuh dibulatkan ke atas, tanpa desimal/milidetik
   if (snap) {
     if (snap.status === 'Scheduled') { const s = Math.max(0, Math.ceil((snap.quizStart - now()) / 1000)); $('waitCount').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
-    else if (snap.status === 'Live') { const left = Math.max(0, snap.qEnd - now()); $('timer').textContent = (left / 1000).toFixed(1); $('barFill').style.width = Math.min(100, left / Math.max(1, snap.qEnd - snap.qStart) * 100) + '%'; if (left === 0) lock(true); }
+    else if (snap.status === 'Live') { const left = Math.max(0, snap.qEnd - now()); $('timer').textContent = Math.ceil(left / 1000); $('barFill').style.width = Math.min(100, left / Math.max(1, snap.qEnd - snap.qStart) * 100) + '%'; if (left === 0) lock(true); }
   }
   T.raf = requestAnimationFrame(tick);
 }
