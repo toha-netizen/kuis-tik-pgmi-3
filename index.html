@@ -51,7 +51,7 @@
 <script src="config/app-config.js"></script>
 <script>
 const C = window.APP_CONFIG, $ = id => document.getElementById(id), IMG_RE = /^https:\/\/lh3\.googleusercontent\.com\/d\/[\w-]+$/;
-let slotMs = 25000, token = sessionStorage.getItem('token'), offset = 0, quizId = null, snap = null, answeredQ = null, T = { poll: 0, dash: 0, sec: 0, raf: 0 }, curQid = null;
+let token = sessionStorage.getItem('token'), offset = 0, quizId = null, snap = null, answeredQ = null, T = { poll: 0, dash: 0, sec: 0, raf: 0 }, curQid = null;
 const now = () => Date.now() + offset, fmt = ms => new Date(ms).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
 function h(tag, props, ...kids) { const e = document.createElement(tag); Object.assign(e, props || {}); kids.flat().forEach(k => e.append(k)); return e; }
 
@@ -90,7 +90,7 @@ function fail(e, target) {
 function toDash() { show('dash'); loadDash(); T.dash = setInterval(loadDash, 5000); T.sec = setInterval(tickDash, 1000); }
 async function loadDash() {
   const t0 = Date.now();
-  try { const d = await api({ action: 'myQuizzes' }); syncClock(d, t0); slotMs = d.slotMs || slotMs; conn(true); $('dashMsg').textContent = ''; drawDash(d); }
+  try { const d = await api({ action: 'myQuizzes' }); syncClock(d, t0); conn(true); $('dashMsg').textContent = ''; drawDash(d); }
   catch (e) { fail(e, $('dashMsg')); }
 }
 function drawDash(d) {
@@ -109,7 +109,7 @@ function drawDash(d) {
     if (cd) cd.querySelector('.cd').dataset.start = k.startAt;
     box.append(h('div', { className: 'card' }, h('div', { className: 'row' }, h('b', { textContent: k.judul }), h('span', { className: 'badge ' + k.status, textContent: lab })),
       k.mapel ? h('div', { className: 'mu', textContent: k.mapel }) : '', k.deskripsi ? h('p', { textContent: k.deskripsi }) : '',
-      h('div', { className: 'mu', textContent: 'Mulai ' + fmt(k.startAt) + ' · Berakhir ' + fmt(k.endAt) + ' · ' + k.jumlahSoal + ' soal · ' + Math.round(slotMs / 1000) + ' detik per soal' }), cd, act));
+      h('div', { className: 'mu', textContent: 'Mulai ' + fmt(k.startAt) + ' · Berakhir ' + fmt(k.endAt) + ' · ' + k.jumlahSoal + ' soal · ' + k.durasiDetik + ' detik per soal' }), cd, act));
   });
   tickDash();
 }
@@ -133,7 +133,7 @@ async function poll() {
   }
 }
 function render(d) {
-  if (d.status === 'Scheduled') { show('wait'); $('waitMsg').textContent = 'Kuis dimulai pada ' + fmt(d.quizStart) + '. Tetap di halaman ini.'; return; }
+  if (d.status === 'Scheduled') { show('wait'); $('waitMsg').textContent = 'Kuis dimulai pada ' + fmt(d.quizStart) + '. Waktu menjawab tiap soal: ' + Math.round(d.slotMs / 1000) + ' detik. Tetap di halaman ini.'; return; }
   if (d.status === 'Finished') { const id = quizId; showResult(id, d.judul); return; }
   if ($('v-quiz').classList.contains('hide')) { $('v-quiz').classList.remove('hide'); $('v-wait').classList.add('hide'); }
   $('qno').textContent = 'Soal ' + d.index + ' / ' + d.total;
