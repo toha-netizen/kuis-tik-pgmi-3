@@ -51,6 +51,9 @@
         <select id="qzMode"><option value="semua">Peserta: semua / sesuai kelas</option><option value="terpilih">Peserta: dipilih manual</option></select>
         <select id="qzStatus"><option>draft</option><option>published</option><option>archived</option></select></div>
       <textarea id="qzDesk" placeholder="Deskripsi"></textarea>
+      <div class="row"><label><b>Durasi menjawab per soal</b> <input id="qzSlot" type="number" min="5" max="300" step="1" style="width:80px" aria-label="Durasi menjawab per soal dalam detik"> detik</label>
+        <span class="mu">Pilih cepat:</span><button type="button" data-slot="10">10</button><button type="button" data-slot="15">15</button><button type="button" data-slot="20">20</button><button type="button" data-slot="30">30</button><button type="button" data-slot="45">45</button><button type="button" data-slot="60">60</button>
+        <span id="qzSlotNote" class="mu"></span></div>
       <fieldset class="dt"><legend>Jadwal kuis (zona waktu mengikuti perangkat Anda)</legend>
         <div class="row"><b class="lbl">Mulai</b><input id="qzStartD" type="date" aria-label="Tanggal mulai"><button type="button" data-pick="qzStartD" title="Pilih tanggal">📅</button>
           <input id="qzStartT" type="time" step="60" aria-label="Jam mulai"><button type="button" data-pick="qzStartT" title="Pilih jam">🕐</button></div>
@@ -62,7 +65,7 @@
         <p id="qzSummary" class="mu" role="status"></p></fieldset>
       <label><input id="qzShow" type="checkbox"> Tampilkan hasil ke siswa setelah selesai</label>
       <button class="pr" id="btnSaveQz">Simpan kuis</button> <button id="btnNewQz">Kosongkan form</button>
-      <p class="mu">Durasi tiap soal tetap <b id="slotInfo">25</b> detik. Setelah kuis dimulai: waktu mulai dan peserta terkunci; waktu berakhir masih bisa diubah (tercatat di audit).</p>
+      <p class="mu">Durasi menjawab diatur per kuis (5–300 detik). Setelah kuis dimulai: durasi, waktu mulai, dan peserta terkunci; waktu berakhir masih bisa diubah (tercatat di audit).</p>
       <div class="scroll"><table id="qzTable"></table></div>
 
       <div id="pBox" class="hide"><h3 id="pTitle"></h3><p class="mu">Centang peserta (dipakai bila mode "dipilih manual").</p><input id="pFilter" placeholder="Cari"><div id="pList" class="chk"></div><button class="pr" id="btnSaveP">Simpan peserta</button></div>
@@ -116,7 +119,7 @@
     <!-- Pengaturan -->
     <section id="t-set" class="card hide">
       <h3>Pengaturan sistem</h3>
-      <div class="row"><label>Masa sesi (jam) <input id="stHours" type="number" min="1" max="24" style="width:80px"></label><label>PIN minimal <input id="stPin" type="number" min="4" max="12" style="width:80px"></label>
+      <div class="row"><label>Masa sesi (jam) <input id="stHours" type="number" min="1" max="24" style="width:80px"></label><label>Durasi bawaan per soal (detik) <input id="stSlot" type="number" min="5" max="300" style="width:80px"></label><label>PIN minimal <input id="stPin" type="number" min="4" max="12" style="width:80px"></label>
         <label>Desimal CSV <select id="stDec"><option value="dot">titik (7.00)</option><option value="comma">koma (7,00)</option></select></label><button class="pr" id="btnSaveSet">Simpan</button></div>
       <h3>Akun admin</h3><div class="scroll"><table id="adTable"></table></div>
       <div class="row"><input id="adUn" placeholder="Username baru"><input id="adPw" type="password" placeholder="Kata sandi (min. 10)"><button id="btnAddAd">Tambah admin</button></div>
@@ -167,7 +170,7 @@ $('btnLogin').onclick = () => run(async () => {
 
 /* ---- ringkasan & pemantauan ---- */
 function loadDash() { run(async () => {
-  const d = await api({ action: 'dashboard' }); slotSec = d.slotMs / 1000; $('slotInfo').textContent = slotSec;
+  const d = await api({ action: 'dashboard' }); slotSec = d.defaultSlotSec; if (!editQuiz && !$('qzSlot').value) $('qzSlot').value = slotSec;
   $('dash').replaceChildren(...[['Siswa', d.siswa], ['Kuis', d.kuis], ['Draft', d.draft], ['Terjadwal', d.scheduled], ['Berlangsung', d.live], ['Selesai', d.finished], ['Arsip', d.archived], ['Peserta aktif', d.pesertaAktif]].map(([t, v]) => h('div', { className: 'card stat' }, h('b', {}, String(v)), t)));
 }); }
 $('btnDash').onclick = loadDash;
@@ -211,7 +214,7 @@ const faseLabel = { Live: 'Berlangsung', Scheduled: 'Terjadwal', Finished: 'Sele
 function drawQuizzes() {
   const keepH = $('hQuiz').value, keepM = $('mQuiz').value;
   quizzes.sort((x, y) => (faseOrder[x.fase] - faseOrder[y.fase]) || (y.startAt - x.startAt));
-  fill($('qzTable'), ['Judul', 'Fase', 'Soal', 'Mulai', 'Berakhir', ''], quizzes.map(q => { const done = q.status !== 'draft' && q.fase !== 'Scheduled'; return [q.judul + (q.kelas ? ' [' + q.kelas + ']' : ''), faseLabel[q.fase] || q.fase, String(q.jumlahSoal), fmtTime(q.startAt), fmtTime(q.endedAt || q.endAt),
+  fill($('qzTable'), ['Judul', 'Fase', 'Soal', 'Durasi/soal', 'Mulai', 'Berakhir', ''], quizzes.map(q => { const done = q.status !== 'draft' && q.fase !== 'Scheduled'; return [q.judul + (q.kelas ? ' [' + q.kelas + ']' : ''), faseLabel[q.fase] || q.fase, String(q.jumlahSoal), q.durasiDetik + ' dtk', fmtTime(q.startAt), fmtTime(q.endedAt || q.endAt),
     h('span', {}, btn('Edit', () => fillQuiz(q)), btn('Soal', () => openQ(q)), btn('Peserta', () => openP(q)),
       done ? btn(q.fase === 'Live' ? 'Peringkat live' : 'Peringkat', () => openRanking(q.id), 'pr') : '', done ? btn('Unduh nilai', () => exportCsv('ringkas', q.id)) : '',
       btn('Duplikat', () => run(async () => { await api({ action: 'duplicateQuiz', id: q.id }); ok('Salinan dibuat sebagai draft.'); loadQuizzes(); })),
@@ -224,12 +227,16 @@ function drawQuizzes() {
   if (pendingQuiz) { const id = pendingQuiz; pendingQuiz = null; $('hQuiz').value = id; loadRanking(true); }
 }
 function archive(q) { run(async () => { await api(Object.assign(quizBody(q), { action: 'saveQuiz', status: 'archived' })); ok('Kuis diarsipkan.'); loadQuizzes(); }); }
-const quizBody = q => ({ id: q.id, judul: q.judul, deskripsi: q.deskripsi, mapel: q.mapel, kelas: q.kelas, pesertaMode: q.pesertaMode, status: q.status, startAt: q.startAt, endAt: q.endAt, showResults: q.showResults });
+const quizBody = q => ({ durasiDetik: q.durasiDetik, id: q.id, judul: q.judul, deskripsi: q.deskripsi, mapel: q.mapel, kelas: q.kelas, pesertaMode: q.pesertaMode, status: q.status, startAt: q.startAt, endAt: q.endAt, showResults: q.showResults });
 function fillQuiz(q) {
   editQuiz = q ? q.id : null; editCount = q ? q.jumlahSoal : 0; $('qzTitle').textContent = q ? 'Edit kuis' : 'Kuis baru';
   $('qzJudul').value = q ? q.judul : ''; $('qzMapel').value = q ? q.mapel : ''; $('qzKelas').value = q ? q.kelas : ''; $('qzDesk').value = q ? q.deskripsi : '';
   $('qzMode').value = q ? q.pesertaMode : 'semua'; $('qzStatus').value = q ? q.status : 'draft'; $('qzShow').checked = q ? q.showResults : false;
-  writeDT('qzStartD', 'qzStartT', q ? q.startAt : 0); writeDT('qzEndD', 'qzEndT', q ? q.endAt : 0); $('qzDur').value = q ? Math.round((q.endAt - q.startAt) / 60000) : ''; qzSummary();
+  writeDT('qzStartD', 'qzStartT', q ? q.startAt : 0); writeDT('qzEndD', 'qzEndT', q ? q.endAt : 0); $('qzDur').value = q ? Math.round((q.endAt - q.startAt) / 60000) : '';
+  const started = !!q && q.status === 'published' && q.fase !== 'Scheduled';   // status dari jam server, bukan jam perangkat
+  $('qzSlot').value = q ? q.durasiDetik : slotSec; $('qzSlot').disabled = started;
+  document.querySelectorAll('[data-slot]').forEach(b => b.disabled = started); $('qzSlotNote').textContent = started ? '🔒 terkunci karena kuis sudah dimulai' : '';
+  qzSummary();
 }
 /* ---- pemilih tanggal & jam ---- */
 const pad = n => String(n).padStart(2, '0');
@@ -237,15 +244,16 @@ const dStr = ms => { const d = new Date(ms); return d.getFullYear() + '-' + pad(
 const readDT = (d, t) => ($(d).value && $(t).value ? new Date($(d).value + 'T' + $(t).value).getTime() : NaN);
 function writeDT(d, t, ms) { $(d).value = ms ? dStr(ms) : ''; $(t).value = ms ? tStr(ms) : ''; }
 const fmtDur = ms => { const m = Math.ceil(ms / 60000); return m >= 60 ? Math.floor(m / 60) + ' jam ' + (m % 60) + ' menit' : m + ' menit'; };
+const curSlot = () => { const v = Number($('qzSlot').value); return Number.isInteger(v) && v >= 5 && v <= 300 ? v : slotSec; };
 function qzSummary() {
-  const s = readDT('qzStartD', 'qzStartT'), e = readDT('qzEndD', 'qzEndT'), el = $('qzSummary'), need = editCount * slotSec * 1000;
+  const s = readDT('qzStartD', 'qzStartT'), e = readDT('qzEndD', 'qzEndT'), el = $('qzSummary'), need = editCount * curSlot() * 1000;
   el.className = 'mu';
   if (isNaN(s) || isNaN(e)) { el.textContent = 'Pilih tanggal dan jam mulai serta berakhir (atau isi durasi).'; return; }
   const f = ms => new Date(ms).toLocaleString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   if (e <= s) { el.className = 'err'; el.textContent = 'Waktu berakhir harus setelah waktu mulai.'; return; }
   let t = 'Mulai ' + f(s) + ' → berakhir ' + f(e) + ' (durasi ' + fmtDur(e - s) + ').';
-  if (editCount > 0 && e - s < need) { el.className = 'err'; t += ' ⚠ Terlalu pendek: ' + editCount + ' soal × ' + slotSec + ' dtk butuh minimal ' + fmtDur(need) + '; soal terakhir akan terpotong.'; }
-  else if (editCount > 0) t += ' ' + editCount + ' soal × ' + slotSec + ' dtk = ' + fmtDur(need) + '.';
+  if (editCount > 0 && e - s < need) { el.className = 'err'; t += ' ⚠ Terlalu pendek: ' + editCount + ' soal × ' + curSlot() + ' dtk butuh minimal ' + fmtDur(need) + '; soal terakhir akan terpotong.'; }
+  else if (editCount > 0) t += ' ' + editCount + ' soal × ' + curSlot() + ' dtk = ' + fmtDur(need) + '.';
   el.textContent = t;
 }
 function qzSync(src) {
@@ -263,22 +271,25 @@ document.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => {
   if (b.dataset.preset === 'tomorrow') { d.setDate(d.getDate() + 1); d.setHours(7, 0, 0, 0); ms = d.getTime(); }
   else { d.setMinutes(d.getMinutes() + Number(b.dataset.preset) + 1, 0, 0); ms = d.getTime(); }
   writeDT('qzStartD', 'qzStartT', ms);
-  if (!Number($('qzDur').value)) $('qzDur').value = editCount > 0 ? Math.ceil(editCount * slotSec / 60) + 1 : 15;
+  if (!Number($('qzDur').value)) $('qzDur').value = editCount > 0 ? Math.ceil(editCount * curSlot() / 60) + 1 : 15;
   qzSync('start');
 });
 $('btnAutoEnd').onclick = () => run(async () => {
   if (isNaN(readDT('qzStartD', 'qzStartT'))) throw bad('Isi tanggal dan jam mulai dulu');
   if (editCount < 1) throw bad('Kuis belum punya soal. Tambahkan soal dulu, atau isi durasi (menit) secara manual.');
-  $('qzDur').value = Math.ceil(editCount * slotSec / 60) + 1; qzSync('dur');
+  $('qzDur').value = Math.ceil(editCount * curSlot() / 60) + 1; qzSync('dur');
 });
+$('qzSlot').addEventListener('input', qzSummary);
+document.querySelectorAll('[data-slot]').forEach(b => b.onclick = () => { if ($('qzSlot').disabled) return; $('qzSlot').value = b.dataset.slot; qzSummary(); });
 $('btnNewQz').onclick = () => fillQuiz(null);
 $('btnSaveQz').onclick = () => run(async () => {
-  const s = readDT('qzStartD', 'qzStartT'), e = readDT('qzEndD', 'qzEndT');
+  const s = readDT('qzStartD', 'qzStartT'), e = readDT('qzEndD', 'qzEndT'), slot = Number($('qzSlot').value);
+  if (!Number.isInteger(slot) || slot < 5 || slot > 300) throw bad('Durasi menjawab per soal harus bilangan bulat 5–300 detik');
   if (isNaN(s) || isNaN(e)) throw bad('Isi tanggal dan jam mulai serta berakhir');
   if (e <= s) throw bad('Waktu berakhir harus setelah waktu mulai');
   if (editCount > 0 && e - s < editCount * slotSec * 1000 && !confirm('Jadwal lebih pendek dari ' + fmtDur(editCount * slotSec * 1000) + '; soal terakhir akan terpotong. Tetap simpan?')) return;
   await api({ action: 'saveQuiz', id: editQuiz, judul: val('qzJudul'), mapel: val('qzMapel'), kelas: val('qzKelas'), deskripsi: val('qzDesk'), pesertaMode: $('qzMode').value, status: $('qzStatus').value,
-    showResults: $('qzShow').checked, startAt: s, endAt: e });
+    showResults: $('qzShow').checked, startAt: s, endAt: e, durasiDetik: slot });
   ok('Kuis disimpan.'); fillQuiz(null); loadQuizzes();
 });
 
@@ -443,11 +454,11 @@ $('btnAudit').onclick = loadAudit;
 
 /* ---- pengaturan & akun admin ---- */
 function loadSettings() { run(async () => {
-  const s = await api({ action: 'getSettings' }); $('stHours').value = s.SESSION_HOURS; $('stPin').value = s.MIN_PIN; $('stDec').value = s.CSV_DECIMAL;
+  const s = await api({ action: 'getSettings' }); $('stHours').value = s.SESSION_HOURS; $('stSlot').value = s.DEFAULT_SLOT_SEC; $('stPin').value = s.MIN_PIN; $('stDec').value = s.CSV_DECIMAL;
   const ads = await api({ action: 'listAdmins' });
   fill($('adTable'), ['Username', 'Status', ''], ads.map(a => [a.username, a.aktif ? 'Aktif' : 'Nonaktif', btn(a.aktif ? 'Nonaktifkan' : 'Aktifkan', () => run(async () => { await api({ action: 'setAdminActive', id: a.id, aktif: !a.aktif }); loadSettings(); }))]));
 }); }
-$('btnSaveSet').onclick = () => run(async () => { await api({ action: 'saveSettings', values: { SESSION_HOURS: val('stHours'), MIN_PIN: val('stPin'), CSV_DECIMAL: $('stDec').value } }); ok('Pengaturan disimpan.'); });
+$('btnSaveSet').onclick = () => run(async () => { await api({ action: 'saveSettings', values: { DEFAULT_SLOT_SEC: val('stSlot'), SESSION_HOURS: val('stHours'), MIN_PIN: val('stPin'), CSV_DECIMAL: $('stDec').value } }); ok('Pengaturan disimpan.'); });
 $('btnAddAd').onclick = () => run(async () => { await api({ action: 'addAdmin', username: val('adUn'), password: $('adPw').value }); $('adUn').value = ''; $('adPw').value = ''; ok('Admin ditambahkan.'); loadSettings(); });
 $('btnCp').onclick = () => run(async () => { await api({ action: 'changeAdminPassword', oldPassword: $('cpOld').value, newPassword: $('cpNew').value }); $('cpOld').value = ''; $('cpNew').value = ''; ok('Kata sandi diganti.'); });
 
